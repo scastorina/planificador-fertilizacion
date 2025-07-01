@@ -1,57 +1,37 @@
-<<<<<<< HEAD
-# app_planificador.py (Versión Final con corrección para despliegue)
-=======
-/* assets/greyscale_theme.css (Versión Final) */
->>>>>>> e8ba53c048f99b12d4d5072804d6c4ccff3b9483
+# app_planificador.py (Versión Final sin errores de sintaxis)
 
-:root {
-    --bg-body: #f8f9fa;
-    --bg-container: #ffffff;
-    --text-primary: #202124;
-    --text-secondary: #5f6368;
-    --border-color: #dee2e6;
-    --nav-sidebar-width: 80px;
-    --accent-primary: #343a40;
-    --accent-primary-hover: #495057;
-    --accent-secondary-bg: #f1f3f4;
-    --accent-secondary-hover: #e8eaed;
-    --accent-secondary-text: #3c4043;
-}
-body { font-family: 'Roboto', 'Segoe UI', Arial, sans-serif; background-color: var(--bg-body); color: var(--text-primary); margin: 0; overflow-y: hidden; }
-.material-symbols-outlined { font-size: 24px; vertical-align: middle; }
+import dash
+from dash import Dash, dash_table, html, dcc, Input, Output, State, MATCH
+import pandas as pd
+import os
+import numpy as np
+import datetime
+from dateutil.relativedelta import relativedelta
+from fpdf import FPDF
 
-/* --- Estructura Principal --- */
-.app-container { display: flex; height: 100vh; }
-.nav-sidebar { width: var(--nav-sidebar-width); flex-shrink: 0; background-color: var(--bg-container); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; align-items: center; padding: 20px 0; gap: 15px; }
-.main-content-wrapper { flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; }
-.main-content { flex-grow: 1; padding: 0 30px; overflow-y: auto; }
-.logo-header { text-align: center; padding: 15px 0; border-bottom: 1px solid var(--border-color); }
-.page-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 0; border-bottom: 1px solid var(--border-color); margin-bottom: 20px; }
-.page-header h1 { font-size: 1.8rem; font-weight: 500; margin: 0; }
+# --- 1. CONFIGURACIÓN INICIAL Y DATOS ---
+DATA_PATH = "data"
+REQ_FILE = os.path.join(DATA_PATH, "requerimientos.csv")
+FERT_FILE = os.path.join(DATA_PATH, "fertilizantes.csv")
+DIST1_FILE = os.path.join(DATA_PATH, "distribucion_1.csv")
+DIST2_FILE = os.path.join(DATA_PATH, "distribucion_2.csv")
+VALV_FILE = os.path.join(DATA_PATH, "valvulas.csv")
+FECHA_FILE = os.path.join(DATA_PATH, "fecha_inicio_riego.txt")
+LIMITES_FILE = os.path.join(DATA_PATH, "limites_nutrientes.csv")
+PLAN_SEMANAL_FILE = os.path.join(DATA_PATH, "plan_semanal_guardado.csv")
+APLIC_REALES_FILE = os.path.join(DATA_PATH, "aplicaciones_reales.csv")
 
-/* --- Navegación Sidebar --- */
-.nav-link { display: flex; align-items: center; justify-content: center; width: 50px; height: 50px; border-radius: 50%; color: var(--text-secondary); text-decoration: none; }
-.nav-link:hover { background-color: var(--accent-secondary-hover); }
-.nav-link.active { background-color: #e8f0fe; color: #1967d2; }
-.nav-sidebar .config-button-wrapper { margin-top: auto; padding-bottom: 10px; }
-.config-button { background: none; border: none; cursor: pointer; border-radius: 50%; padding: 12px; display:flex; }
-.config-button:hover { background-color: var(--accent-secondary-hover); }
+if not os.path.exists(DATA_PATH): os.makedirs(DATA_PATH)
+if not os.path.exists('assets'): os.makedirs('assets')
 
-/* --- Modal de Configuración --- */
-.modal-backdrop { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0, 0, 0, 0.5); display: flex; justify-content: center; align-items: center; z-index: 1050; }
-.modal-container { background: var(--bg-container); padding: 25px; border-radius: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.2); width: 90%; max-width: 900px; max-height: 90vh; display: flex; flex-direction: column; }
-.modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 15px; margin-bottom: 20px; }
-.modal-header h2 { margin: 0; font-weight: 500; }
-.modal-body { overflow-y: auto; }
-.close-button { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-secondary); }
-.accordion-button { background: none; border: none; width: 100%; text-align: left; font-size: 1rem; font-weight: 500; color: var(--text-primary); padding: 12px 10px; cursor: pointer; border-radius: 8px; display: flex; align-items: center; gap: 16px; white-space: nowrap; }
-.accordion-button:hover { background-color: #f1f3f4; }
-.accordion-icon { margin-left: auto; transition: transform 0.3s; }
-.accordion-button.open .accordion-icon { transform: rotate(180deg); }
-.accordion-content { max-height: 0; overflow: hidden; transition: max-height 0.35s ease-in-out; background-color: #fafafa; border-radius: 8px; margin-top: -5px; margin-bottom: 5px; }
-.accordion-content.open { max-height: 1500px; padding: 20px; }
+# --- Funciones para definir datos por defecto ---
+def definir_requerimientos(): return pd.DataFrame({'Sector': ["Chacra Vieja", "Chacra Pivot", "Chacra Isla", "Chacra Isla", "Chacra Isla", "Chacra Isla"], 'Anio': [2011, 2012, 2016, 2017, 2018, 2019], 'Sup_ha': [11, 38, 30, 34, 14, 55], 'N': [180, 200, 190, 180, 170, 140], 'P': [70, 65, 60, 45, 40, 30], 'K': [240, 230, 230, 180, 140, 120], 'Mg': [30, 25, 20, 18, 15, 15]})
+def definir_fertilizantes(): return pd.DataFrame({'Producto': ["BIOINICIO", "NITRON", "BIOPRODUCCION", "BIOPREMIUM"], 'N': [0.03, 0.28, 0, 0], 'P2O5': [0.20, 0, 0, 0], 'K2O': [0, 0, 0.20, 0], 'S': [0, 0.03, 0.08, 0.06], 'MgO': [0, 0, 0, 0.06], 'Densidad': [1.188, 1.320, 1.250, 1.350], 'Precio': [2.5, 1.8, 2.0, 3.0]})
+def definir_distribucion1(): return pd.DataFrame({'Mes': ["Octubre", "Noviembre", "Diciembre", "Enero", "Febrero/Marzo"], 'N': [0.10, 0.27, 0.33, 0.15, 0.15], 'P': [0, 0, 0.70, 0, 0.30], 'K': [0, 0.25, 0.45, 0.10, 0.20], 'Mg': [0, 0.30, 0.30, 0.15, 0.25]})
+def definir_distribucion2(): return pd.DataFrame({'Mes': ["Octubre", "Noviembre", "Diciembre", "Enero", "Febrero/Marzo"], 'N': [0.10, 0.35, 0.35, 0.10, 0.10], 'P': [0, 0, 0.70, 0.10, 0.20], 'K': [0, 0.20, 0.50, 0.15, 0.15], 'Mg': [0, 0.30, 0.30, 0.15, 0.25]})
+def definir_valvulas(): return pd.DataFrame({'Año': [2011, 2012, 2016, 2017, 2018, 2018.1, 2019, 2019.1], 'Valvula_1': [12, 4.6, 8.0, 5, 7.8, 6, 11, 8], 'Valvula_2': [26, 6.4, 9.1, 5, 7.7, np.nan, 12, np.nan], 'Valvula_3': [np.nan, np.nan, 8.5, 5, 10.4, np.nan, 12, np.nan], 'Valvula_4': [np.nan, np.nan, 9.7, 5, 8.8, np.nan, 10, np.nan]})
+def definir_limites(): return pd.DataFrame({'Nutriente': ['N', 'P', 'K', 'Mg'], 'Limite_kg_ha_app': [40, 20, 35, 5]})
 
-<<<<<<< HEAD
 # --- Funciones de Lógica ---
 def cargar_o_crear(filepath, default_function):
     if os.path.exists(filepath):
@@ -418,13 +398,3 @@ def generar_orden_trabajo_pdf(n_clicks, data, fecha, sector, anio):
 
 if __name__ == '__main__':
     app.run(debug=True)
-=======
-/* --- Otros --- */
-h4 { font-weight: 500; color: var(--text-primary); margin-top: 25px; margin-bottom: 15px; }
-.dash-spreadsheet { border-radius: 8px !important; border: 1px solid var(--border-color) !important; }
-.Button { border-radius: 8px !important; padding: 10px 18px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid transparent; transition: background-color 0.2s; }
-.Button-primary { background-color: var(--accent-primary); color: white; }
-.Button-primary:hover { background-color: var(--accent-primary-hover); }
-.Button-secondary { background-color: var(--accent-secondary-bg); color: var(--accent-secondary-text); border-color: var(--border-color); }
-.Button-secondary:hover { background-color: var(--accent-secondary-hover); }
->>>>>>> e8ba53c048f99b12d4d5072804d6c4ccff3b9483
