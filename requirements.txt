@@ -1,0 +1,7 @@
+# requirements.txt
+
+dash
+pandas
+numpy
+fpdf2
+gunicorn
