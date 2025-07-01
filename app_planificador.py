@@ -1,4 +1,4 @@
-# app_planificador.py (Versión Definitiva con corrección final para despliegue)
+# app_planificador.py (Versión Final)
 
 import dash
 from dash import Dash, dash_table, html, dcc, Input, Output, State, MATCH
@@ -39,6 +39,7 @@ def cargar_o_crear(filepath, default_function):
         except pd.errors.EmptyDataError: return default_function()
     else:
         df = default_function(); df.to_csv(filepath, index=False); return df
+
 def generar_plan_mensual_economico():
     try:
         df_req = cargar_o_crear(REQ_FILE, definir_requerimientos); df_fert = cargar_o_crear(FERT_FILE, definir_fertilizantes); df_dist1 = cargar_o_crear(DIST1_FILE, definir_distribucion1); df_dist2 = cargar_o_crear(DIST2_FILE, definir_distribucion2)
@@ -67,6 +68,7 @@ def generar_plan_mensual_economico():
         if not resultados_list: return pd.DataFrame({'Mensaje': ["No se generaron opciones."]})
         return pd.DataFrame(resultados_list)
     except Exception as e: return pd.DataFrame({'Error': [f"Ocurrió un error: {e}"]})
+
 def generar_plan_semanal(df_plan_mensual, df_valvulas, df_limites, fecha_inicio_riego_str):
     if df_plan_mensual.empty or "Mensaje" in df_plan_mensual.columns or "Error" in df_plan_mensual.columns: return pd.DataFrame({'Error': ["Se necesita un Plan Mensual válido."]})
     try:
@@ -113,7 +115,7 @@ def generar_plan_semanal(df_plan_mensual, df_valvulas, df_limites, fecha_inicio_
 # --- LAYOUT DE LA APP Y CALLBACKS ---
 external_stylesheets = ['https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap', 'https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined']
 app = Dash(__name__, suppress_callback_exceptions=True, external_stylesheets=external_stylesheets)
-server = app.server # <<< LÍNEA AÑADIDA PARA RENDER >>>
+server = app.server
 app.title = "Planificador de Fertilización"
 
 # --- Carga de datos iniciales ---
@@ -394,7 +396,7 @@ def generar_orden_trabajo_pdf(n_clicks, data, fecha, sector, anio):
     pdf.cell(90, 10, '_________________________', 0, 0, 'C'); pdf.cell(90, 10, '_________________________', 0, 1, 'C')
     pdf.cell(90, 5, 'Firma Responsable Finca', 0, 0, 'C'); pdf.cell(90, 5, 'Firma Operario', 0, 1, 'C')
     
-    return dcc.send_bytes(lambda f: f.write(pdf.output()), f"orden_trabajo_{datetime.date.today()}.pdf")
+    return dcc.send_bytes(lambda f: f.write(pdf.output(encoding='latin-1')), f"orden_trabajo_{datetime.date.today()}.pdf")
 
 if __name__ == '__main__':
     app.run(debug=True)
