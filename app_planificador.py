@@ -1,4 +1,4 @@
-# app_planificador.py (Versión Final sin errores de sintaxis)
+# app_planificador.py (Versión con KPIs en página de Seguimiento)
 
 import dash
 from dash import Dash, dash_table, html, dcc, Input, Output, State, MATCH
@@ -9,6 +9,7 @@ import datetime
 from dateutil.relativedelta import relativedelta
 from fpdf import FPDF
 
+# (El resto de las secciones de configuración y funciones de lógica no cambian)
 # --- 1. CONFIGURACIÓN INICIAL Y DATOS ---
 DATA_PATH = "data"
 REQ_FILE = os.path.join(DATA_PATH, "requerimientos.csv")
@@ -185,10 +186,26 @@ columnas_seguimiento_inicial = [
     {'name': 'Observaciones', 'id': 'Observaciones', 'editable': True, 'presentation': 'input'},
 ]
 
+def kpi_card(title, value_id, icon):
+    return html.Div(className='kpi-card', children=[
+        html.H5(title),
+        html.H3(id=value_id, children="-")
+    ])
+
 def layout_seguimiento():
     return html.Div([
         html.Div(className='page-header', children=[html.H1("Seguimiento y Órdenes de Trabajo")]),
-        html.Button("Cargar/Refrescar Plan", id="btn-cargar-seguimiento", className="Button Button-secondary"),
+        # <<< NUEVO: Contenedor de Tarjetas KPI >>>
+        html.Div(className='kpi-container', children=[
+            kpi_card("Litros Totales Aplicados", "kpi-litros-reales", "water_drop"),
+            kpi_card("Diferencia vs. Plan (L)", "kpi-dif-litros", "difference"),
+            kpi_card("Diferencia de Costos (USD)", "kpi-dif-costo", "attach_money"),
+            kpi_card("Cumplimiento del Plan", "kpi-cumplimiento", "checklist"),
+        ]),
+        html.Div(style={'display': 'flex', 'gap': '10px', 'marginBottom': '20px', 'alignItems': 'center'}, children=[
+            html.Button("Cargar/Refrescar Plan", id="btn-cargar-seguimiento", className="Button Button-secondary"),
+            html.Button("Guardar Datos y Auto-Ajustar Plan", id="btn-guardar-reales", className="Button Button-primary"),
+        ]),
         html.H4("Órden de Trabajo"),
         html.Div(style={'display': 'flex', 'alignItems': 'flex-end', 'gap': '15px', 'marginBottom': '20px'}, children=[
             html.Div([html.Label("Fecha de Riego"), dcc.DatePickerSingle(id='filtro-fecha-orden', style={'width': '150px'})]),
@@ -197,9 +214,7 @@ def layout_seguimiento():
             html.Button([html.I(className="material-symbols-outlined", children="print"), "Generar Orden (PDF)"], id="btn-generar-orden-pdf", className="Button Button-secondary"),
         ]),
         html.H4("Aplicaciones Reales (Editable)"),
-        dcc.Loading(type="circle", children=[dash_table.DataTable(id='tabla-aplicaciones-reales', data=[], columns=columnas_seguimiento_inicial, row_deletable=False, page_size=15, style_table={'overflowX': 'auto'})]),
-        html.Br(),
-        html.Button("Guardar Datos y Auto-Ajustar Plan", id="btn-guardar-reales", className="Button Button-primary"),
+        dcc.Loading(type="circle", children=[dash_table.DataTable(id='tabla-aplicaciones-reales', data=[], columns=columnas_seguimiento_inicial, row_deletable=False, page_size=10, style_table={'overflowX': 'auto'})]),
         html.Div(id='notificacion-seguimiento', style={'marginTop': '20px'}),
     ])
 
@@ -294,6 +309,7 @@ def actualizar_vista_plan_semanal(plan_data, anio_seleccionado):
     if anio_seleccionado != 'todos': df = df[df['Año Plantación'] == int(anio_seleccionado)]
     data, cols = limpiar_y_preparar_tabla(df); return dash_table.DataTable(id='tabla-plan-semanal', data=data, columns=cols, page_size=10, style_table={'overflowX': 'auto'})
 
+# ... (callbacks de descarga y seguimiento sin cambios)
 @app.callback(Output("download-excel-mensual", "data"), Input("btn-download-mensual", "n_clicks"), [State('store-plan-mensual', 'data'), State('dropdown-filtro-anio', 'value')], prevent_initial_call=True)
 def descargar_plan_mensual(n_clicks, data, anio_seleccionado):
     if not n_clicks or not data or dash.callback_context.triggered_id != 'btn-download-mensual': raise dash.exceptions.PreventUpdate
@@ -301,7 +317,6 @@ def descargar_plan_mensual(n_clicks, data, anio_seleccionado):
     if anio_seleccionado != 'todos': df = df[df['Año Plantación'] == int(anio_seleccionado)]
     nombre_archivo = f"plan_mensual_{anio_seleccionado}.xlsx" if anio_seleccionado != 'todos' else "plan_mensual_completo.xlsx"
     return dcc.send_data_frame(df.to_excel, nombre_archivo, sheet_name="Plan Mensual", index=False)
-
 @app.callback(Output("download-excel-semanal", "data"), Input("btn-download-semanal", "n_clicks"), [State('store-plan-semanal', 'data'), State('dropdown-filtro-anio', 'value')], prevent_initial_call=True)
 def descargar_plan_semanal(n_clicks, data, anio_seleccionado):
     if not n_clicks or not data or dash.callback_context.triggered_id != 'btn-download-semanal': raise dash.exceptions.PreventUpdate
@@ -309,7 +324,6 @@ def descargar_plan_semanal(n_clicks, data, anio_seleccionado):
     if anio_seleccionado != 'todos': df = df[df['Año Plantación'] == int(anio_seleccionado)]
     nombre_archivo = f"plan_semanal_{anio_seleccionado}.xlsx" if anio_seleccionado != 'todos' else "plan_semanal_completo.xlsx"
     return dcc.send_data_frame(df.to_excel, nombre_archivo, sheet_name="Plan Semanal", index=False)
-
 @app.callback(Output('tabla-aplicaciones-reales', 'data'), Input('btn-cargar-seguimiento', 'n_clicks'))
 def cargar_seguimiento(n_clicks):
     if n_clicks is None: raise dash.exceptions.PreventUpdate
@@ -330,7 +344,6 @@ def cargar_seguimiento(n_clicks):
             df_reales['Fecha Estimada'] = df_reales['Fecha Estimada'].dt.strftime('%Y-%m-%d')
         data, _ = limpiar_y_preparar_tabla(df_reales)
         return data
-
 @app.callback(Output('notificacion-seguimiento', 'children'), Input('btn-guardar-reales', 'n_clicks'), State('tabla-aplicaciones-reales', 'data'), prevent_initial_call=True)
 def guardar_datos_reales(n_clicks, data):
     if not data: return html.P("No hay datos para guardar.", style={'color': 'orange'})
@@ -355,7 +368,6 @@ def guardar_datos_reales(n_clicks, data):
     df_modificado['Fecha Estimada'] = df_modificado['Fecha Estimada'].dt.strftime('%Y-%m-%d')
     df_modificado.to_csv(APLIC_REALES_FILE, index=False)
     return html.P("¡Datos guardados y plan auto-ajustado con éxito!", style={'color': '#1E8E3E', 'fontWeight': 'bold'})
-
 @app.callback(Output("download-orden-pdf", "data"), Input("btn-generar-orden-pdf", "n_clicks"), [State('tabla-aplicaciones-reales', 'data'), State('filtro-fecha-orden', 'date'), State('filtro-sector-orden', 'value'), State('filtro-anio-orden', 'value')], prevent_initial_call=True)
 def generar_orden_trabajo_pdf(n_clicks, data, fecha, sector, anio):
     if not n_clicks or not data: raise dash.exceptions.PreventUpdate
@@ -367,34 +379,72 @@ def generar_orden_trabajo_pdf(n_clicks, data, fecha, sector, anio):
     if sector and sector != 'todos': df = df[df['Sector'] == sector]
     if anio and anio != 'todos': df = df[df['Año Plantación'] == int(anio)]
     if df.empty: return None
-
     class PDF(FPDF):
         def header(self):
-            self.image('assets/Logo Fortin Castre.jpg', 10, 8, 33)
-            self.set_font('helvetica', 'B', 15)
-            self.cell(0, 10, 'Orden de Trabajo de Fertilización', 0, 1, 'C')
-            self.image('assets/Logo Rivera Grande.jpg', 170, 8, 33)
-            self.ln(10)
+            self.image('assets/Logo Fortin Castre.jpg', 10, 8, 33); self.set_font('helvetica', 'B', 15); self.cell(0, 10, 'Orden de Trabajo de Fertilización', 0, 1, 'C'); self.image('assets/Logo Rivera Grande.jpg', 170, 8, 33); self.ln(10)
         def footer(self):
             self.set_y(-15); self.set_font('helvetica', 'I', 8); self.cell(0, 10, f'Página {self.page_no()}', 0, 0, 'C')
-
-    pdf = PDF()
-    pdf.add_page()
-    pdf.set_font('helvetica', '', 10)
-    pdf.cell(0, 10, f"Fecha de Emisión: {datetime.date.today().strftime('%d/%m/%Y')}", 0, 1)
-    pdf.set_font('helvetica', 'B', 10)
+    pdf = PDF(); pdf.add_page(); pdf.set_font('helvetica', '', 10); pdf.cell(0, 10, f"Fecha de Emisión: {datetime.date.today().strftime('%d/%m/%Y')}", 0, 1); pdf.set_font('helvetica', 'B', 10)
     pdf.cell(45, 7, 'Sector', 1, 0, 'C'); pdf.cell(20, 7, 'Válvula', 1, 0, 'C'); pdf.cell(45, 7, 'Producto', 1, 0, 'C'); pdf.cell(30, 7, 'Litros a Aplicar', 1, 0, 'C'); pdf.cell(40, 7, 'Litros Reales', 1, 1, 'C')
     pdf.set_font('helvetica', '', 10)
     for _, row in df.iterrows():
         pdf.cell(45, 10, str(row['Sector']), 1, 0); pdf.cell(20, 10, str(row['Válvula']), 1, 0); pdf.cell(45, 10, str(row['Producto']), 1, 0)
         pdf.cell(30, 10, f"{pd.to_numeric(row['Litros Planeados'], errors='coerce'):.2f}", 1, 0, 'R'); pdf.cell(40, 10, '', 1, 1)
-    pdf.ln(15); pdf.cell(0, 10, 'Observaciones:', 0, 1)
-    pdf.multi_cell(w=0, h=10, text='', border=1, align='L')
-    pdf.ln(25)
+    pdf.ln(15); pdf.cell(0, 10, 'Observaciones:', 0, 1); pdf.multi_cell(w=0, h=10, text='', border=1, align='L'); pdf.ln(25)
     pdf.cell(90, 10, '_________________________', 0, 0, 'C'); pdf.cell(90, 10, '_________________________', 0, 1, 'C')
     pdf.cell(90, 5, 'Firma Responsable Finca', 0, 0, 'C'); pdf.cell(90, 5, 'Firma Operario', 0, 1, 'C')
-    
     return dcc.send_bytes(lambda f: f.write(pdf.output()), f"orden_trabajo_{datetime.date.today()}.pdf")
+
+# <<< NUEVO: Callback para actualizar las tarjetas de KPI >>>
+@app.callback(
+    Output('kpi-litros-reales', 'children'),
+    Output('kpi-dif-litros', 'children'),
+    Output('kpi-dif-costo', 'children'),
+    Output('kpi-cumplimiento', 'children'),
+    Output('kpi-dif-litros', 'className'),
+    Output('kpi-dif-costo', 'className'),
+    Input('tabla-aplicaciones-reales', 'data')
+)
+def actualizar_kpis_seguimiento(data):
+    if not data:
+        return "-", "-", "-", "-", "kpi-value", "kpi-value"
+
+    df = pd.DataFrame(data).copy()
+    
+    # Filtrar solo las filas donde se ha registrado una aplicación real
+    df_aplicado = df[pd.to_numeric(df['Litros Reales Aplicados'], errors='coerce').notna()].copy()
+
+    if df_aplicado.empty:
+        return "0 L", "0 L", "$ 0.00", "0 %", "kpi-value", "kpi-value"
+
+    # --- Cálculo de Litros ---
+    total_litros_reales = pd.to_numeric(df_aplicado['Litros Reales Aplicados'], errors='coerce').sum()
+    total_litros_planeados = pd.to_numeric(df_aplicado['Litros Planeados'], errors='coerce').sum()
+    diferencia_litros = total_litros_reales - total_litros_planeados
+    
+    # --- Cálculo de Costos ---
+    df_fert = cargar_o_crear(FERT_FILE, definir_fertilizantes)
+    df_aplicado = pd.merge(df_aplicado, df_fert[['Producto', 'Precio', 'Densidad']], on='Producto', how='left')
+    
+    costo_real = (pd.to_numeric(df_aplicado['Litros Reales Aplicados'], errors='coerce') * df_aplicado['Densidad']) * df_aplicado['Precio']
+    costo_planeado = (pd.to_numeric(df_aplicado['Litros Planeados'], errors='coerce') * df_aplicado['Densidad']) * df_aplicado['Precio']
+    diferencia_costo = costo_real.sum() - costo_planeado.sum()
+
+    # --- Cálculo de Cumplimiento ---
+    total_aplicaciones_plan = len(df[pd.to_datetime(df['Fecha Estimada']) <= datetime.datetime.now()])
+    total_aplicaciones_hechas = len(df_aplicado)
+    cumplimiento_pct = (total_aplicaciones_hechas / total_aplicaciones_plan * 100) if total_aplicaciones_plan > 0 else 0
+    
+    # --- Formateo de Salidas ---
+    kpi1 = f"{total_litros_reales:,.0f} L"
+    kpi2 = f"{diferencia_litros:,.0f} L"
+    kpi3 = f"$ {diferencia_costo:,.2f}"
+    kpi4 = f"{cumplimiento_pct:.1f} %"
+    
+    class_dif_litros = "kpi-value kpi-diferencia-pos" if diferencia_litros > 0 else "kpi-value kpi-diferencia-neg"
+    class_dif_costo = "kpi-value kpi-diferencia-pos" if diferencia_costo > 0 else "kpi-value kpi-diferencia-neg"
+
+    return kpi1, kpi2, kpi3, kpi4, class_dif_litros, class_dif_costo
 
 if __name__ == '__main__':
     app.run(debug=True)
