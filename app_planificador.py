@@ -1,4 +1,4 @@
-# app_planificador.py (Versión con KPIs a la Fecha y Totales)
+# app_planificador.py (Versión Definitiva con corrección final para despliegue)
 
 import dash
 from dash import Dash, dash_table, html, dcc, Input, Output, State, MATCH
@@ -9,7 +9,7 @@ import datetime
 from dateutil.relativedelta import relativedelta
 from fpdf import FPDF
 
-# --- 1. CONFIGURACIÓN INICIAL Y DATOS (Sin Cambios) ---
+# --- 1. CONFIGURACIÓN INICIAL Y DATOS ---
 DATA_PATH = "data"
 REQ_FILE = os.path.join(DATA_PATH, "requerimientos.csv")
 FERT_FILE = os.path.join(DATA_PATH, "fertilizantes.csv")
@@ -24,7 +24,7 @@ APLIC_REALES_FILE = os.path.join(DATA_PATH, "aplicaciones_reales.csv")
 if not os.path.exists(DATA_PATH): os.makedirs(DATA_PATH)
 if not os.path.exists('assets'): os.makedirs('assets')
 
-# --- Funciones para definir datos por defecto (Sin Cambios) ---
+# --- Funciones para definir datos por defecto ---
 def definir_requerimientos(): return pd.DataFrame({'Sector': ["Chacra Vieja", "Chacra Pivot", "Chacra Isla", "Chacra Isla", "Chacra Isla", "Chacra Isla"], 'Anio': [2011, 2012, 2016, 2017, 2018, 2019], 'Sup_ha': [11, 38, 30, 34, 14, 55], 'N': [180, 200, 190, 180, 170, 140], 'P': [70, 65, 60, 45, 40, 30], 'K': [240, 230, 230, 180, 140, 120], 'Mg': [30, 25, 20, 18, 15, 15]})
 def definir_fertilizantes(): return pd.DataFrame({'Producto': ["BIOINICIO", "NITRON", "BIOPRODUCCION", "BIOPREMIUM"], 'N': [0.03, 0.28, 0, 0], 'P2O5': [0.20, 0, 0, 0], 'K2O': [0, 0, 0.20, 0], 'S': [0, 0.03, 0.08, 0.06], 'MgO': [0, 0, 0, 0.06], 'Densidad': [1.188, 1.320, 1.250, 1.350], 'Precio': [2.5, 1.8, 2.0, 3.0]})
 def definir_distribucion1(): return pd.DataFrame({'Mes': ["Octubre", "Noviembre", "Diciembre", "Enero", "Febrero/Marzo"], 'N': [0.10, 0.27, 0.33, 0.15, 0.15], 'P': [0, 0, 0.70, 0, 0.30], 'K': [0, 0.25, 0.45, 0.10, 0.20], 'Mg': [0, 0.30, 0.30, 0.15, 0.25]})
@@ -32,7 +32,7 @@ def definir_distribucion2(): return pd.DataFrame({'Mes': ["Octubre", "Noviembre"
 def definir_valvulas(): return pd.DataFrame({'Año': [2011, 2012, 2016, 2017, 2018, 2018.1, 2019, 2019.1], 'Valvula_1': [12, 4.6, 8.0, 5, 7.8, 6, 11, 8], 'Valvula_2': [26, 6.4, 9.1, 5, 7.7, np.nan, 12, np.nan], 'Valvula_3': [np.nan, np.nan, 8.5, 5, 10.4, np.nan, 12, np.nan], 'Valvula_4': [np.nan, np.nan, 9.7, 5, 8.8, np.nan, 10, np.nan]})
 def definir_limites(): return pd.DataFrame({'Nutriente': ['N', 'P', 'K', 'Mg'], 'Limite_kg_ha_app': [40, 20, 35, 5]})
 
-# --- Funciones de Lógica (Sin Cambios) ---
+# --- Funciones de Lógica ---
 def cargar_o_crear(filepath, default_function):
     if os.path.exists(filepath):
         try: return pd.read_csv(filepath)
@@ -113,6 +113,7 @@ def generar_plan_semanal(df_plan_mensual, df_valvulas, df_limites, fecha_inicio_
 # --- LAYOUT DE LA APP Y CALLBACKS ---
 external_stylesheets = ['https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap', 'https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined']
 app = Dash(__name__, suppress_callback_exceptions=True, external_stylesheets=external_stylesheets)
+server = app.server # <<< LÍNEA AÑADIDA PARA RENDER >>>
 app.title = "Planificador de Fertilización"
 
 # --- Carga de datos iniciales ---
@@ -134,9 +135,8 @@ def crear_acordeon_item(titulo, content_id, children, icono='table_rows'):
 
 # --- Definición de Componentes y Layouts ---
 nav_sidebar = html.Div(className='nav-sidebar', children=[
-    dcc.Link(html.I(className="material-symbols-outlined", children="table_chart"), href="/planificacion", className="nav-link", id="link-planificacion"),
+    dcc.Link(html.I(className="material-symbols-outlined", children="table_chart"), href="/", className="nav-link", id="link-planificacion"),
     dcc.Link(html.I(className="material-symbols-outlined", children="rule"), href="/seguimiento", className="nav-link", id="link-seguimiento"),
-    dcc.Link(html.I(className="material-symbols-outlined", children="monitoring"), href="/dashboard", className="nav-link", id="link-dashboard"),
     html.Div(className="config-button-wrapper", children=[html.Button(html.I(className="material-symbols-outlined", children="settings"), id="btn-abrir-config", className="config-button")])
 ])
 
@@ -188,29 +188,19 @@ columnas_seguimiento_inicial = [
 def layout_seguimiento():
     return html.Div([
         html.Div(className='page-header', children=[html.H1("Seguimiento y Órdenes de Trabajo")]),
-        html.Div(style={'display': 'flex', 'gap': '10px', 'marginBottom': '20px'}, children=[
-             html.Button("Cargar/Refrescar Plan", id="btn-cargar-seguimiento", className="Button Button-secondary"),
-             html.Button([html.I(className="material-symbols-outlined", children="print"), "Generar Orden (PDF)"], id="btn-generar-orden-pdf", className="Button Button-secondary"),
-        ]),
-        html.H4("Filtros para Órden de Trabajo"),
+        html.Button("Cargar/Refrescar Plan", id="btn-cargar-seguimiento", className="Button Button-secondary"),
+        html.H4("Órden de Trabajo"),
         html.Div(style={'display': 'flex', 'alignItems': 'flex-end', 'gap': '15px', 'marginBottom': '20px'}, children=[
             html.Div([html.Label("Fecha de Riego"), dcc.DatePickerSingle(id='filtro-fecha-orden', style={'width': '150px'})]),
             html.Div([html.Label("Sector"), dcc.Dropdown(id='filtro-sector-orden', options=opciones_dropdown_sector, placeholder="Todos", style={'width': '200px'})]),
             html.Div([html.Label("Año Plantación"), dcc.Dropdown(id='filtro-anio-orden', options=opciones_dropdown_anio, placeholder="Todos", style={'width': '150px'})]),
+            html.Button([html.I(className="material-symbols-outlined", children="print"), "Generar Orden (PDF)"], id="btn-generar-orden-pdf", className="Button Button-secondary"),
         ]),
         html.H4("Aplicaciones Reales (Editable)"),
         dcc.Loading(type="circle", children=[dash_table.DataTable(id='tabla-aplicaciones-reales', data=[], columns=columnas_seguimiento_inicial, row_deletable=False, page_size=15, style_table={'overflowX': 'auto'})]),
         html.Br(),
         html.Button("Guardar Datos y Auto-Ajustar Plan", id="btn-guardar-reales", className="Button Button-primary"),
         html.Div(id='notificacion-seguimiento', style={'marginTop': '20px'}),
-    ])
-
-# <<< NUEVO: Layout para la página del Dashboard >>>
-def layout_dashboard():
-    return html.Div([
-        html.Div(className='page-header', children=[html.H1("Dashboard de KPIs")]),
-        html.Button("Actualizar KPIs", id="btn-calcular-kpis", className="Button Button-secondary"),
-        dcc.Loading(type="circle", children=[html.Div(id='kpi-container', className='kpi-container')])
     ])
 
 app.layout = html.Div(className='app-container', children=[
@@ -230,13 +220,10 @@ app.layout = html.Div(className='app-container', children=[
 ])
 
 # --- Callbacks ---
-# <<< MODIFICADO: El router ahora incluye la ruta al dashboard >>>
 @app.callback(Output('page-content', 'children'), Input('url', 'pathname'))
 def display_page(pathname):
     if pathname == '/seguimiento': return layout_seguimiento()
-    if pathname == '/dashboard': return layout_dashboard()
-    # Por defecto, o si la ruta es /planificacion, se muestra la página de planificación
-    return layout_planificacion()
+    else: return layout_planificacion()
 
 @app.callback(Output('modal-backdrop', 'style'), [Input('btn-abrir-config', 'n_clicks'), Input('btn-cerrar-config', 'n_clicks')], prevent_initial_call=True)
 def toggle_config_modal(n_open, n_close):
@@ -270,7 +257,8 @@ def limpiar_y_preparar_tabla(df):
         if "Mensaje" in df.columns: return df.to_dict('records'), [{"name": i, "id": i} for i in df.columns]
         return [], []
     for col in ['Litros Planeados', 'Litros Reales Aplicados']:
-        if col in df.columns: df[col] = pd.to_numeric(df[col], errors='coerce')
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
     numeric_cols = df.select_dtypes(include=np.number).columns; df[numeric_cols] = df[numeric_cols].round(2)
     cols = [{"name": i, "id": i} for i in df.columns]; data = df.to_dict('records')
     return data, cols
@@ -379,77 +367,34 @@ def generar_orden_trabajo_pdf(n_clicks, data, fecha, sector, anio):
     if sector and sector != 'todos': df = df[df['Sector'] == sector]
     if anio and anio != 'todos': df = df[df['Año Plantación'] == int(anio)]
     if df.empty: return None
+
     class PDF(FPDF):
-        def header(self): self.image('assets/Logo Fortin Castre.jpg', 10, 8, 33); self.set_font('helvetica', 'B', 15); self.cell(0, 10, 'Orden de Trabajo de Fertilización', 0, 1, 'C'); self.image('assets/Logo Rivera Grande.jpg', 170, 8, 33); self.ln(10)
-        def footer(self): self.set_y(-15); self.set_font('helvetica', 'I', 8); self.cell(0, 10, f'Página {self.page_no()}', 0, 0, 'C')
-    pdf = PDF(); pdf.add_page(); pdf.set_font('helvetica', '', 10); pdf.cell(0, 10, f"Fecha de Emisión: {datetime.date.today().strftime('%d/%m/%Y')}", 0, 1); pdf.set_font('helvetica', 'B', 10)
+        def header(self):
+            self.image('assets/Logo Fortin Castre.jpg', 10, 8, 33)
+            self.set_font('helvetica', 'B', 15)
+            self.cell(0, 10, 'Orden de Trabajo de Fertilización', 0, 1, 'C')
+            self.image('assets/Logo Rivera Grande.jpg', 170, 8, 33)
+            self.ln(10)
+        def footer(self):
+            self.set_y(-15); self.set_font('helvetica', 'I', 8); self.cell(0, 10, f'Página {self.page_no()}', 0, 0, 'C')
+
+    pdf = PDF()
+    pdf.add_page()
+    pdf.set_font('helvetica', '', 10)
+    pdf.cell(0, 10, f"Fecha de Emisión: {datetime.date.today().strftime('%d/%m/%Y')}", 0, 1)
+    pdf.set_font('helvetica', 'B', 10)
     pdf.cell(45, 7, 'Sector', 1, 0, 'C'); pdf.cell(20, 7, 'Válvula', 1, 0, 'C'); pdf.cell(45, 7, 'Producto', 1, 0, 'C'); pdf.cell(30, 7, 'Litros a Aplicar', 1, 0, 'C'); pdf.cell(40, 7, 'Litros Reales', 1, 1, 'C')
     pdf.set_font('helvetica', '', 10)
     for _, row in df.iterrows():
         pdf.cell(45, 10, str(row['Sector']), 1, 0); pdf.cell(20, 10, str(row['Válvula']), 1, 0); pdf.cell(45, 10, str(row['Producto']), 1, 0)
         pdf.cell(30, 10, f"{pd.to_numeric(row['Litros Planeados'], errors='coerce'):.2f}", 1, 0, 'R'); pdf.cell(40, 10, '', 1, 1)
-    pdf.ln(15); pdf.cell(0, 10, 'Observaciones:', 0, 1); pdf.multi_cell(w=0, h=10, text='', border=1, align='L')
-    pdf.ln(25); pdf.cell(90, 10, '_________________________', 0, 0, 'C'); pdf.cell(90, 10, '_________________________', 0, 1, 'C'); pdf.cell(90, 5, 'Firma Responsable Finca', 0, 0, 'C'); pdf.cell(90, 5, 'Firma Operario', 0, 1, 'C')
+    pdf.ln(15); pdf.cell(0, 10, 'Observaciones:', 0, 1)
+    pdf.multi_cell(w=0, h=10, text='', border=1, align='L')
+    pdf.ln(25)
+    pdf.cell(90, 10, '_________________________', 0, 0, 'C'); pdf.cell(90, 10, '_________________________', 0, 1, 'C')
+    pdf.cell(90, 5, 'Firma Responsable Finca', 0, 0, 'C'); pdf.cell(90, 5, 'Firma Operario', 0, 1, 'C')
+    
     return dcc.send_bytes(lambda f: f.write(pdf.output()), f"orden_trabajo_{datetime.date.today()}.pdf")
-
-# <<< NUEVO: Callback para el Dashboard de KPIs >>>
-@app.callback(Output('kpi-container', 'children'), Input('btn-calcular-kpis', 'n_clicks'))
-def calcular_kpis(n_clicks):
-    if n_clicks is None: raise dash.exceptions.PreventUpdate
-    hoy = pd.to_datetime(datetime.date.today())
-    df_plan_original = cargar_o_crear(PLAN_SEMANAL_FILE, lambda: pd.DataFrame())
-    df_reales = cargar_o_crear(APLIC_REALES_FILE, lambda: pd.DataFrame())
-    df_fert = cargar_o_crear(FERT_FILE, definir_fertilizantes)
-    if df_plan_original.empty or df_reales.empty: return html.P("No hay datos suficientes. Genere un plan y cargue datos de seguimiento.")
-    
-    df_plan_original['Fecha Estimada'] = pd.to_datetime(df_plan_original['Fecha Estimada'])
-    df_reales['Fecha Aplicación Real'] = pd.to_datetime(df_reales['Fecha Aplicación Real'], errors='coerce')
-
-    # Filtrar dataframes para el cálculo "a la fecha"
-    plan_a_la_fecha = df_plan_original[df_plan_original['Fecha Estimada'] <= hoy].copy()
-    reales_a_la_fecha = df_reales[df_reales['Fecha Aplicación Real'] <= hoy].copy()
-
-    col_map_nutrientes_inv = {'N': 'N', 'P2O5': 'P', 'K2O': 'K', 'MgO': 'Mg'}
-    
-    def calcular_kg_nutriente(df, col_litros):
-        kg_nutrientes = {'N': 0, 'P': 0, 'K': 0, 'Mg': 0}
-        df_merged = pd.merge(df, df_fert, on='Producto', how='left')
-        for nutriente_df, nutriente_base in col_map_nutrientes_inv.items():
-            if nutriente_df in df_merged.columns:
-                df_merged[nutriente_base] = pd.to_numeric(df_merged[col_litros], errors='coerce') * df_merged['Densidad'] * df_merged[nutriente_df]
-                kg_nutrientes[nutriente_base] = df_merged[nutriente_base].sum()
-        return kg_nutrientes
-
-    totales_plan_a_la_fecha = calcular_kg_nutriente(plan_a_la_fecha, 'Litros Planeados')
-    totales_reales_a_la_fecha = calcular_kg_nutriente(reales_a_la_fecha, 'Litros Reales Aplicados')
-    totales_plan_total = calcular_kg_nutriente(df_plan_original, 'Litros Planeados')
-    totales_reales_total = calcular_kg_nutriente(df_reales, 'Litros Reales Aplicados')
-    
-    kpi_cards = []
-    for nutriente, nombre_completo in {'N': 'Nitrógeno', 'P': 'Fósforo', 'K': 'Potasio', 'Mg': 'Magnesio'}.items():
-        plan_fecha = totales_plan_a_la_fecha.get(nutriente, 0)
-        real_fecha = totales_reales_a_la_fecha.get(nutriente, 0)
-        porcentaje_fecha = (real_fecha / plan_fecha * 100) if plan_fecha > 0 else 0
-        
-        if 90 <= porcentaje_fecha <= 110: color, status_text = 'green', 'En Objetivo'
-        elif 80 <= porcentaje_fecha < 90 or 110 < porcentaje_fecha <= 120: color, status_text = 'yellow', 'Desvío Leve'
-        else: color, status_text = 'red', 'Desvío Crítico'
-
-        card = html.Div(className=f'kpi-card {color}', children=[
-            html.Div([
-                html.H3(f"{nombre_completo} ({nutriente})"),
-                html.P(f"Plan a la fecha: {plan_fecha:.1f} kg | Real: {real_fecha:.1f} kg", style={'fontSize': '0.9em', 'color': 'var(--text-secondary)'}),
-                html.Div(f"{porcentaje_fecha:.1f}%", className='kpi-value'),
-                html.Div(status_text, className='kpi-status'),
-            ]),
-            html.Div(style={'marginTop': '15px', 'borderTop': f'1px solid {color}', 'paddingTop': '10px'}, children=[
-                html.P(f"Progreso Total Campaña: {totales_reales_total.get(nutriente, 0):.1f} / {totales_plan_total.get(nutriente, 0):.1f} kg", style={'fontSize': '0.8em', 'fontWeight': 'bold'})
-            ])
-        ])
-        kpi_cards.append(card)
-
-    return kpi_cards
-
 
 if __name__ == '__main__':
     app.run(debug=True)
