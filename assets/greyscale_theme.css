@@ -13,29 +13,19 @@
     --accent-secondary-hover: #e8eaed;
     --accent-secondary-text: #3c4043;
 }
-body { font-family: 'Roboto', 'Segoe UI', Arial, sans-serif; background-color: var(--bg-body); color: var(--text-primary); margin: 0; }
+body { font-family: 'Roboto', 'Segoe UI', Arial, sans-serif; background-color: var(--bg-body); color: var(--text-primary); margin: 0; overflow-y: hidden; }
 .material-symbols-outlined { font-size: 24px; vertical-align: middle; }
 
 /* --- Estructura Principal --- */
 .app-container { display: flex; height: 100vh; }
+.nav-sidebar { width: var(--nav-sidebar-width); flex-shrink: 0; background-color: var(--bg-container); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; align-items: center; padding: 20px 0; gap: 15px; }
 .main-content-wrapper { flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; }
 .main-content { flex-grow: 1; padding: 0 30px; overflow-y: auto; }
 .logo-header { text-align: center; padding: 15px 0; border-bottom: 1px solid var(--border-color); }
 .page-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 0; border-bottom: 1px solid var(--border-color); margin-bottom: 20px; }
 .page-header h1 { font-size: 1.8rem; font-weight: 500; margin: 0; }
 
-/* --- Barra de Navegación Lateral --- */
-.nav-sidebar {
-    width: var(--nav-sidebar-width);
-    flex-shrink: 0;
-    background-color: var(--bg-container);
-    border-right: 1px solid var(--border-color);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 20px 0;
-    gap: 15px;
-}
+/* --- Navegación Sidebar --- */
 .nav-link { display: flex; align-items: center; justify-content: center; width: 50px; height: 50px; border-radius: 50%; color: var(--text-secondary); text-decoration: none; }
 .nav-link:hover { background-color: var(--accent-secondary-hover); }
 .nav-link.active { background-color: #e8f0fe; color: #1967d2; }
