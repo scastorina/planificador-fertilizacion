@@ -1,4 +1,4 @@
-# app.py (Versión con Dashboard Analítico)
+# app.py (Versión con Dashboard Corregido y Optimizado)
 
 import dash
 from dash import Dash, dash_table, html, dcc, Input, Output, State, MATCH
@@ -11,7 +11,6 @@ from fpdf import FPDF
 import plotly.express as px
 
 # --- 1. CONFIGURACIÓN INICIAL Y DATOS (Sin Cambios) ---
-# ... (toda la sección de configuración y funciones de datos por defecto permanece igual) ...
 DATA_PATH = "data"
 REQ_FILE = os.path.join(DATA_PATH, "requerimientos.csv")
 FERT_FILE = os.path.join(DATA_PATH, "fertilizantes.csv")
@@ -26,14 +25,17 @@ APLIC_REALES_FILE = os.path.join(DATA_PATH, "aplicaciones_reales.csv")
 if not os.path.exists(DATA_PATH): os.makedirs(DATA_PATH)
 if not os.path.exists('assets'): os.makedirs('assets')
 
+# --- Funciones para definir datos por defecto (Sin Cambios) ---
 def definir_requerimientos(): return pd.DataFrame({'Sector': ["Chacra Vieja", "Chacra Pivot", "Chacra Isla", "Chacra Isla", "Chacra Isla", "Chacra Isla"], 'Anio': [2011, 2012, 2016, 2017, 2018, 2019], 'Sup_ha': [11, 38, 30, 34, 14, 55], 'N': [180, 200, 190, 180, 170, 140], 'P': [70, 65, 60, 45, 40, 30], 'K': [240, 230, 230, 180, 140, 120], 'Mg': [30, 25, 20, 18, 15, 15]})
 def definir_fertilizantes(): return pd.DataFrame({'Producto': ["BIOINICIO", "NITRON", "BIOPRODUCCION", "BIOPREMIUM"], 'N': [0.03, 0.28, 0, 0], 'P2O5': [0.20, 0, 0, 0], 'K2O': [0, 0, 0.20, 0], 'S': [0, 0.03, 0.08, 0.06], 'MgO': [0, 0, 0, 0.06], 'Densidad': [1.188, 1.320, 1.250, 1.350], 'Precio': [2.5, 1.8, 2.0, 3.0]})
 def definir_distribucion1(): return pd.DataFrame({'Mes': ["Octubre", "Noviembre", "Diciembre", "Enero", "Febrero/Marzo"], 'N': [0.10, 0.27, 0.33, 0.15, 0.15], 'P': [0, 0, 0.70, 0, 0.30], 'K': [0, 0.25, 0.45, 0.10, 0.20], 'Mg': [0, 0.30, 0.30, 0.15, 0.25]})
 def definir_distribucion2(): return pd.DataFrame({'Mes': ["Octubre", "Noviembre", "Diciembre", "Enero", "Febrero/Marzo"], 'N': [0.10, 0.35, 0.35, 0.10, 0.10], 'P': [0, 0, 0.70, 0.10, 0.20], 'K': [0, 0.20, 0.50, 0.15, 0.15], 'Mg': [0, 0.30, 0.30, 0.15, 0.25]})
 def definir_valvulas(): return pd.DataFrame({'Año': [2011, 2012, 2016, 2017, 2018, 2018.1, 2019, 2019.1], 'Valvula_1': [12, 4.6, 8.0, 5, 7.8, 6, 11, 8], 'Valvula_2': [26, 6.4, 9.1, 5, 7.7, np.nan, 12, np.nan], 'Valvula_3': [np.nan, np.nan, 8.5, 5, 10.4, np.nan, 12, np.nan], 'Valvula_4': [np.nan, np.nan, 9.7, 5, 8.8, np.nan, 10, np.nan]})
 def definir_limites(): return pd.DataFrame({'Nutriente': ['N', 'P', 'K', 'Mg'], 'Limite_kg_ha_app': [40, 20, 35, 5]})
+
+# --- Funciones de Lógica ---
 def cargar_o_crear(filepath, default_function):
-    if os.path.exists(filepath):
+    if os.path.exists(filepath) and os.path.getsize(filepath) > 0:
         try: return pd.read_csv(filepath)
         except pd.errors.EmptyDataError: return default_function()
     else:
@@ -121,14 +123,12 @@ df_fert_inicial = cargar_o_crear(FERT_FILE, definir_fertilizantes)
 # (el resto de cargas iniciales se hacen dentro de los layouts)
 
 def crear_acordeon_item(titulo, content_id, children, icono='table_rows'):
-    # ... (sin cambios)
     return html.Div([
         html.Button([html.I(className="material-symbols-outlined", children=icono), html.Span(titulo, className='accordion-text'), html.I(className="material-symbols-outlined accordion-icon", children="expand_more")], id={'type': 'accordion-toggle', 'index': content_id}, className='accordion-button'),
         html.Div(className='accordion-content', id={'type': 'accordion-collapse', 'index': content_id}, children=children)
     ])
 
 # --- Definición de Componentes y Layouts ---
-# <<< MODIFICADO: Se añade el link al nuevo dashboard >>>
 nav_sidebar = html.Div(className='nav-sidebar', children=[
     dcc.Link(html.I(className="material-symbols-outlined", children="table_chart"), href="/", className="nav-link", id="link-planificacion"),
     dcc.Link(html.I(className="material-symbols-outlined", children="rule"), href="/seguimiento", className="nav-link", id="link-seguimiento"),
@@ -136,12 +136,8 @@ nav_sidebar = html.Div(className='nav-sidebar', children=[
     html.Div(className="config-button-wrapper", children=[html.Button(html.I(className="material-symbols-outlined", children="settings"), id="btn-abrir-config", className="config-button")])
 ])
 
-# (Función crear_modal_configuracion sin cambios)
-# ...
 def crear_modal_configuracion():
     # Carga de datos para el modal
-    df_req = cargar_o_crear(REQ_FILE, definir_requerimientos)
-    df_fert = cargar_o_crear(FERT_FILE, definir_fertilizantes)
     df_dist1 = cargar_o_crear(DIST1_FILE, definir_distribucion1)
     df_dist2 = cargar_o_crear(DIST2_FILE, definir_distribucion2)
     df_valv = cargar_o_crear(VALV_FILE, definir_valvulas)
@@ -157,8 +153,8 @@ def crear_modal_configuracion():
                 crear_acordeon_item("Acciones", "content-acciones", [html.Div(id='notificacion-parametros', style={'marginBottom': '10px'}), html.Button("Guardar Configuración", id="btn-guardar-parametros", className="Button Button-primary", style={'width': '100%'}), html.Button("Restaurar Defaults", id="btn-restaurar-parametros", className="Button Button-secondary", style={'width': '100%', 'marginTop': '10px'}),], icono='task_alt'),
                 crear_acordeon_item("Fecha de Inicio", "content-fecha", [dcc.DatePickerSingle(id='fecha-inicio-riego', date=fecha_guardada, style={'width': '100%'})], icono='calendar_month'),
                 crear_acordeon_item("Límites de Nutrientes", "content-limites", [dash_table.DataTable(id='tabla-limites-nutrientes', columns=[{"name": i, "id": i} for i in df_limites.columns], data=df_limites.to_dict('records'), editable=True)], icono='scale'),
-                crear_acordeon_item("Requerimientos Anuales", "content-req", [dash_table.DataTable(id='tabla-req', columns=[{"name": i, "id": i} for i in df_req.columns], data=df_req.to_dict('records'), editable=True, row_deletable=True)], icono='grass'),
-                crear_acordeon_item("Fertilizantes", "content-fert", [dash_table.DataTable(id='tabla-fert', columns=[{"name": i, "id": i} for i in df_fert.columns], data=df_fert.to_dict('records'), editable=True, row_deletable=True)], icono='science'),
+                crear_acordeon_item("Requerimientos Anuales", "content-req", [dash_table.DataTable(id='tabla-req', columns=[{"name": i, "id": i} for i in df_req_inicial.columns], data=df_req_inicial.to_dict('records'), editable=True, row_deletable=True)], icono='grass'),
+                crear_acordeon_item("Fertilizantes", "content-fert", [dash_table.DataTable(id='tabla-fert', columns=[{"name": i, "id": i} for i in df_fert_inicial.columns], data=df_fert_inicial.to_dict('records'), editable=True, row_deletable=True)], icono='science'),
                 crear_acordeon_item("Distribución (2011-17)", "content-dist1", [dash_table.DataTable(id='tabla-dist1', columns=[{"name": i, "id": i} for i in df_dist1.columns], data=df_dist1.to_dict('records'), editable=True)], icono='percent'),
                 crear_acordeon_item("Distribución (2018-19)", "content-dist2", [dash_table.DataTable(id='tabla-dist2', columns=[{"name": i, "id": i} for i in df_dist2.columns], data=df_dist2.to_dict('records'), editable=True)], icono='percent'),
                 crear_acordeon_item("Superficies por Válvula", "content-valvulas", [dash_table.DataTable(id='tabla-valvulas', columns=[{"name": i, "id": i} for i in df_valv.columns], data=df_valv.to_dict('records'), editable=True)], icono='valve'),
@@ -166,14 +162,13 @@ def crear_modal_configuracion():
         ])
     ])
 
-# (layout_planificacion y layout_seguimiento sin cambios)
-# ...
 opciones_dropdown_anio = [{'label': 'Todos los Años', 'value': 'todos'}] + \
     [{'label': str(anio), 'value': int(anio)} for anio in sorted(df_req_inicial['Anio'].unique())]
 opciones_dropdown_sector = [{'label': 'Todos los Sectores', 'value': 'todos'}] + \
     [{'label': sec, 'value': sec} for sec in df_req_inicial['Sector'].unique()]
 
 def layout_planificacion():
+    # ... (sin cambios)
     return html.Div([
         html.Div(className='page-header', children=[html.H1("Planes de Fertilización")]),
         html.Div([html.Button("Generar Plan Mensual", id="btn-generar-mensual", className="Button Button-secondary"), html.Button("Generar Plan Semanal", id="btn-generar-semanal", className="Button Button-secondary")], style={'marginBottom': '20px', 'display': 'flex', 'gap': '10px'}),
@@ -186,17 +181,17 @@ def layout_planificacion():
         dcc.Loading(type="circle", children=[html.Div(id='plan-semanal-container')])
     ])
 
-columnas_seguimiento_inicial = [
-    {'name': 'Sector', 'id': 'Sector'}, {'name': 'Año Plantación', 'id': 'Año Plantación'},
-    {'name': 'Mes Plan', 'id': 'Mes Plan'}, {'name': 'Producto', 'id': 'Producto'},
-    {'name': 'Válvula', 'id': 'Válvula'}, {'name': 'Fecha Estimada', 'id': 'Fecha Estimada'},
-    {'name': 'Litros Planeados', 'id': 'Litros Planeados', 'type': 'numeric', 'format': {'specifier': '.2f'}},
-    {'name': 'Litros Reales Aplicados', 'id': 'Litros Reales Aplicados', 'editable': True, 'type': 'numeric'},
-    {'name': 'Fecha Aplicación Real', 'id': 'Fecha Aplicación Real', 'editable': True},
-    {'name': 'Observaciones', 'id': 'Observaciones', 'editable': True, 'presentation': 'input'},
-]
-
 def layout_seguimiento():
+    # ... (sin cambios)
+    columnas_seguimiento_inicial = [
+        {'name': 'Sector', 'id': 'Sector'}, {'name': 'Año Plantación', 'id': 'Año Plantación'},
+        {'name': 'Mes Plan', 'id': 'Mes Plan'}, {'name': 'Producto', 'id': 'Producto'},
+        {'name': 'Válvula', 'id': 'Válvula'}, {'name': 'Fecha Estimada', 'id': 'Fecha Estimada'},
+        {'name': 'Litros Planeados', 'id': 'Litros Planeados', 'type': 'numeric', 'format': {'specifier': '.2f'}},
+        {'name': 'Litros Reales Aplicados', 'id': 'Litros Reales Aplicados', 'editable': True, 'type': 'numeric'},
+        {'name': 'Fecha Aplicación Real', 'id': 'Fecha Aplicación Real', 'editable': True},
+        {'name': 'Observaciones', 'id': 'Observaciones', 'editable': True, 'presentation': 'input'},
+    ]
     return html.Div([
         html.Div(className='page-header', children=[html.H1("Seguimiento y Órdenes de Trabajo")]),
         html.Button("Cargar/Refrescar Plan", id="btn-cargar-seguimiento", className="Button Button-secondary"),
@@ -208,7 +203,7 @@ def layout_seguimiento():
             html.Button([html.I(className="material-symbols-outlined", children="print"), "Generar Orden (PDF)"], id="btn-generar-orden-pdf", className="Button Button-secondary"),
         ]),
         html.H4("Aplicaciones Reales (Editable)"),
-        dcc.Loading(type="circle", children=[dash_table.DataTable(id='tabla-aplicaciones-reales', data=[], columns=columnas_seguimiento_inicial, row_deletable=False, page_size=15, style_table={'overflowX': 'auto'})]),
+        dcc.Loading(type="circle", children=[dash_table.DataTable(id='tabla-aplicaciones-reales', data=[], columns=columnas_seguimiento_inicial, row_deletable=False, page_size=10, style_table={'overflowX': 'auto'})]),
         html.Br(),
         html.Button("Guardar Datos y Auto-Ajustar Plan", id="btn-guardar-reales", className="Button Button-primary"),
         html.Div(id='notificacion-seguimiento', style={'marginTop': '20px'}),
@@ -236,9 +231,9 @@ def layout_dashboard():
     return html.Div([
         html.Div(className='page-header', children=[html.H1("Dashboard de Seguimiento")]),
         html.Div(className='dashboard-filters', children=[
-            html.Div([html.Label("Sector"), dcc.Dropdown(id='dash-filtro-sector', options=opciones_dropdown_sector, placeholder="Todos")]),
-            html.Div([html.Label("Año"), dcc.Dropdown(id='dash-filtro-anio', options=opciones_dropdown_anio, placeholder="Todos")]),
-            html.Div([html.Label("Mes"), dcc.Dropdown(id='dash-filtro-mes', options=opciones_mes, placeholder="Todos")]),
+            html.Div([html.Label("Sector"), dcc.Dropdown(id='dash-filtro-sector', options=opciones_dropdown_sector, placeholder="Todos", style={'width': '100%'})]),
+            html.Div([html.Label("Año"), dcc.Dropdown(id='dash-filtro-anio', options=opciones_dropdown_anio, placeholder="Todos", style={'width': '100%'})]),
+            html.Div([html.Label("Mes"), dcc.Dropdown(id='dash-filtro-mes', options=opciones_mes, placeholder="Todos", style={'width': '100%'})]),
         ]),
         html.Div(className='kpi-container', children=[
             kpi_card("Total Aplicado (Lts)", "kpi-total-aplicado"),
@@ -247,12 +242,11 @@ def layout_dashboard():
             kpi_card("Cumplimiento Plan (%)", "kpi-cumplimiento"),
         ]),
         html.Div(className='dashboard-graphs', children=[
-            dcc.Graph(id='graph-por-producto', className='graph-card'),
-            dcc.Graph(id='graph-costos', className='graph-card'),
+            dcc.Loading(type="circle", children=dcc.Graph(id='graph-por-producto', className='graph-card')),
+            dcc.Loading(type="circle", children=dcc.Graph(id='graph-costos', className='graph-card')),
         ]),
-        dcc.Graph(id='graph-por-sector', className='graph-card', style={'marginTop': '20px'}),
+        dcc.Loading(type="circle", children=dcc.Graph(id='graph-por-sector', className='graph-card', style={'marginTop': '20px'})),
     ])
-
 
 app.layout = html.Div(className='app-container', children=[
     dcc.Location(id='url', refresh=False),
@@ -271,14 +265,13 @@ app.layout = html.Div(className='app-container', children=[
 ])
 
 # --- Callbacks ---
-# <<< MODIFICADO: El router ahora incluye la ruta al dashboard >>>
 @app.callback(Output('page-content', 'children'), Input('url', 'pathname'))
 def display_page(pathname):
     if pathname == '/seguimiento': return layout_seguimiento()
     if pathname == '/dashboard': return layout_dashboard()
     else: return layout_planificacion()
 
-# (El resto de callbacks de la app permanecen, y se añade el nuevo callback para el dashboard)
+# (Callbacks de modal, acordeón, guardar/restaurar, y generación de planes sin cambios)
 # ...
 @app.callback(Output('modal-backdrop', 'style'), [Input('btn-abrir-config', 'n_clicks'), Input('btn-cerrar-config', 'n_clicks')], prevent_initial_call=True)
 def toggle_config_modal(n_open, n_close):
@@ -402,19 +395,14 @@ def guardar_datos_reales(n_clicks, data):
 @app.callback(Output("download-orden-pdf", "data"), Input("btn-generar-orden-pdf", "n_clicks"), [State('tabla-aplicaciones-reales', 'data'), State('filtro-fecha-orden', 'date'), State('filtro-sector-orden', 'value'), State('filtro-anio-orden', 'value')], prevent_initial_call=True)
 def generar_orden_trabajo_pdf(n_clicks, data, fecha, sector, anio):
     if not n_clicks or not data: raise dash.exceptions.PreventUpdate
-    df = pd.DataFrame(data).copy()
-    df['Fecha Estimada'] = pd.to_datetime(df['Fecha Estimada'])
-    df['Año Plantación'] = df['Año Plantación'].astype(int)
-    df.sort_values(by=['Fecha Estimada', 'Válvula'], inplace=True)
+    df = pd.DataFrame(data).copy(); df['Fecha Estimada'] = pd.to_datetime(df['Fecha Estimada']); df['Año Plantación'] = df['Año Plantación'].astype(int); df.sort_values(by=['Fecha Estimada', 'Válvula'], inplace=True)
     if fecha: df = df[df['Fecha Estimada'].dt.date == pd.to_datetime(fecha).date()]
     if sector and sector != 'todos': df = df[df['Sector'] == sector]
     if anio and anio != 'todos': df = df[df['Año Plantación'] == int(anio)]
     if df.empty: return None
     class PDF(FPDF):
-        def header(self):
-            self.image('assets/Logo Fortin Castre.jpg', 10, 8, 33); self.set_font('helvetica', 'B', 15); self.cell(0, 10, 'Orden de Trabajo de Fertilización', 0, 1, 'C'); self.image('assets/Logo Rivera Grande.jpg', 170, 8, 33); self.ln(10)
-        def footer(self):
-            self.set_y(-15); self.set_font('helvetica', 'I', 8); self.cell(0, 10, f'Página {self.page_no()}', 0, 0, 'C')
+        def header(self): self.image('assets/Logo Fortin Castre.jpg', 10, 8, 33); self.set_font('helvetica', 'B', 15); self.cell(0, 10, 'Orden de Trabajo de Fertilización', 0, 1, 'C'); self.image('assets/Logo Rivera Grande.jpg', 170, 8, 33); self.ln(10)
+        def footer(self): self.set_y(-15); self.set_font('helvetica', 'I', 8); self.cell(0, 10, f'Página {self.page_no()}', 0, 0, 'C')
     pdf = PDF(); pdf.add_page(); pdf.set_font('helvetica', '', 10); pdf.cell(0, 10, f"Fecha de Emisión: {datetime.date.today().strftime('%d/%m/%Y')}", 0, 1); pdf.set_font('helvetica', 'B', 10)
     pdf.cell(45, 7, 'Sector', 1, 0, 'C'); pdf.cell(20, 7, 'Válvula', 1, 0, 'C'); pdf.cell(45, 7, 'Producto', 1, 0, 'C'); pdf.cell(30, 7, 'Litros a Aplicar', 1, 0, 'C'); pdf.cell(40, 7, 'Litros Reales', 1, 1, 'C')
     pdf.set_font('helvetica', '', 10)
@@ -428,72 +416,68 @@ def generar_orden_trabajo_pdf(n_clicks, data, fecha, sector, anio):
 
 # <<< NUEVO: Callback para el Dashboard >>>
 @app.callback(
-    Output('kpi-total-aplicado', 'children'),
-    Output('kpi-diferencia-litros', 'children'),
-    Output('kpi-desvio-costos', 'children'),
-    Output('kpi-cumplimiento', 'children'),
-    Output('graph-por-producto', 'figure'),
-    Output('graph-por-sector', 'figure'),
+    Output('kpi-total-aplicado', 'children'), Output('kpi-diferencia-litros', 'children'),
+    Output('kpi-desvio-costos', 'children'), Output('kpi-cumplimiento', 'children'),
+    Output('graph-por-producto', 'figure'), Output('graph-por-sector', 'figure'),
     Output('graph-costos', 'figure'),
-    Input('dash-filtro-sector', 'value'),
-    Input('dash-filtro-anio', 'value'),
-    Input('dash-filtro-mes', 'value'),
-    Input('url', 'pathname') # Se activa cuando cambiamos a la página del dashboard
+    [Input('dash-filtro-sector', 'value'), Input('dash-filtro-anio', 'value'),
+     Input('dash-filtro-mes', 'value'), Input('url', 'pathname')]
 )
 def update_dashboard(sector, anio, mes, pathname):
-    if pathname != '/dashboard':
-        raise dash.exceptions.PreventUpdate
+    if pathname != '/dashboard': raise dash.exceptions.PreventUpdate
 
-    df = cargar_o_crear(APLIC_REALES_FILE, lambda: pd.DataFrame())
+    df_reales = cargar_o_crear(APLIC_REALES_FILE, lambda: pd.DataFrame())
+    df_plan = cargar_o_crear(PLAN_SEMANAL_FILE, lambda: pd.DataFrame())
     df_fert = cargar_o_crear(FERT_FILE, definir_fertilizantes)
     
-    if df.empty:
-        empty_fig = {'layout': {'xaxis': {'visible': False}, 'yaxis': {'visible': False}, 'annotations': [{'text': 'No hay datos para mostrar', 'xref': 'paper', 'yref': 'paper', 'showarrow': False, 'font': {'size': 16}}]}}
-        return "0 L", "0 L", "$ 0", "0 %", empty_fig, empty_fig, empty_fig
+    empty_fig = {'layout': {'xaxis': {'visible': False}, 'yaxis': {'visible': False}, 'annotations': [{'text': 'No hay datos para mostrar', 'xref': 'paper', 'yref': 'paper', 'showarrow': False, 'font': {'size': 16}}]}}
+    if df_reales.empty:
+        return "0 L", "0 L", "$ 0.00", "0 %", empty_fig, empty_fig, empty_fig
 
-    # Limpieza y filtrado inicial
-    df['Fecha Aplicación Real'] = pd.to_datetime(df['Fecha Aplicación Real'], errors='coerce')
-    df_aplicado = df.dropna(subset=['Fecha Aplicación Real']).copy()
-    
+    df_reales['Fecha Aplicación Real'] = pd.to_datetime(df_reales['Fecha Aplicación Real'], errors='coerce')
+    df_reales['Año Plantación'] = df_reales['Año Plantación'].astype(int)
+    df_aplicado = df_reales.dropna(subset=['Fecha Aplicación Real']).copy()
+
     if df_aplicado.empty:
-        empty_fig = {'layout': {'xaxis': {'visible': False}, 'yaxis': {'visible': False}, 'annotations': [{'text': 'No hay datos de aplicaciones reales', 'xref': 'paper', 'yref': 'paper', 'showarrow': False, 'font': {'size': 16}}]}}
-        return "0 L", "0 L", "$ 0", "0 %", empty_fig, empty_fig, empty_fig
-
-    # Aplicar filtros del dashboard
+        return "0 L", "0 L", "$ 0.00", "0 %", empty_fig, empty_fig, empty_fig
+        
     df_filtrado = df_aplicado.copy()
     if sector and sector != 'todos': df_filtrado = df_filtrado[df_filtrado['Sector'] == sector]
     if anio and anio != 'todos': df_filtrado = df_filtrado[df_filtrado['Año Plantación'] == int(anio)]
-    if mes: df_filtrado = df_filtrado[df_filtrado['Fecha Aplicación Real'].dt.to_period('M').astype(str) == mes]
+    if mes: df_filtrado = df_filtrado[df_filtrado['Fecha Aplicación Real'].dt.strftime('%Y-%m') == mes]
     
-    # Cálculos de KPI
-    total_reales = df_filtrado['Litros Reales Aplicados'].sum()
-    total_planeados = df_filtrado['Litros Planeados'].sum()
+    if df_filtrado.empty:
+        return "0 L", "0 L", "$ 0.00", "N/A", empty_fig, empty_fig, empty_fig
+        
+    total_reales = pd.to_numeric(df_filtrado['Litros Reales Aplicados'], errors='coerce').sum()
+    total_planeados = pd.to_numeric(df_filtrado['Litros Planeados'], errors='coerce').sum()
     dif_litros = total_reales - total_planeados
 
-    df_filtrado = pd.merge(df_filtrado, df_fert[['Producto', 'Precio', 'Densidad']], on='Producto', how='left')
-    costo_real = (df_filtrado['Litros Reales Aplicados'] * df_filtrado['Densidad']) * df_filtrado['Precio']
-    costo_planeado = (df_filtrado['Litros Planeados'] * df_filtrado['Densidad']) * df_filtrado['Precio']
+    df_filtrado = pd.merge(df_filtrado, df_fert[['Producto', 'Precio', 'Densidad']], on='Producto', how='left').fillna(0)
+    costo_real = (pd.to_numeric(df_filtrado['Litros Reales Aplicados'], errors='coerce') * df_filtrado['Densidad']) * df_filtrado['Precio']
+    costo_planeado = (pd.to_numeric(df_filtrado['Litros Planeados'], errors='coerce') * df_filtrado['Densidad']) * df_filtrado['Precio']
     desvio_costos = costo_real.sum() - costo_planeado.sum()
     
-    apps_plan_total = len(df[pd.to_datetime(df['Fecha Estimada']) <= datetime.datetime.now()])
-    apps_hechas_total = len(df.dropna(subset=['Fecha Aplicación Real']))
+    df_plan['Fecha Estimada'] = pd.to_datetime(df_plan['Fecha Estimada'])
+    apps_plan_total = len(df_plan[df_plan['Fecha Estimada'] <= datetime.datetime.now()])
+    apps_hechas_total = len(df_aplicado)
     cumplimiento = (apps_hechas_total / apps_plan_total * 100) if apps_plan_total > 0 else 0
-
-    # Gráficos
-    df_grafico_prod = df_filtrado.groupby('Producto')[['Litros Planeados', 'Litros Reales Aplicados']].sum().reset_index()
+    
+    df_grafico_prod = df_filtrado.groupby('Producto', as_index=False)[['Litros Planeados', 'Litros Reales Aplicados']].sum()
     fig_prod = px.bar(df_grafico_prod, x='Producto', y=['Litros Planeados', 'Litros Reales Aplicados'], barmode='group', title='Aplicación por Producto (Lts)', labels={'value': 'Litros', 'variable': 'Tipo'})
     
-    df_grafico_sec = df_filtrado.groupby('Sector')[['Litros Planeados', 'Litros Reales Aplicados']].sum().reset_index()
+    df_grafico_sec = df_filtrado.groupby('Sector', as_index=False)[['Litros Planeados', 'Litros Reales Aplicados']].sum()
     fig_sec = px.bar(df_grafico_sec, x='Sector', y=['Litros Planeados', 'Litros Reales Aplicados'], barmode='group', title='Aplicación por Sector (Lts)', labels={'value': 'Litros', 'variable': 'Tipo'})
 
     df_filtrado['Costo Real'] = costo_real
-    df_costos = df_filtrado.groupby('Producto')['Costo Real'].sum().reset_index()
+    df_costos = df_filtrado.groupby('Producto', as_index=False)['Costo Real'].sum()
     fig_costos = px.pie(df_costos, names='Producto', values='Costo Real', title='Distribución de Costos por Producto', hole=.3)
 
     for fig in [fig_prod, fig_sec, fig_costos]:
-        fig.update_layout(template="plotly_white", margin=dict(t=50, b=10, l=10, r=10), legend_title_text='')
+        fig.update_layout(template="plotly_white", margin=dict(t=50, b=10, l=10, r=10), legend_title_text='', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
 
     return f"{total_reales:,.0f} L", f"{dif_litros:,.0f} L", f"U$D {desvio_costos:,.2f}", f"{cumplimiento:.1f}%", fig_prod, fig_sec, fig_costos
+
 
 if __name__ == '__main__':
     app.run(debug=True)
